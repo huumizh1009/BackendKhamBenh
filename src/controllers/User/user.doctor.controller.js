@@ -358,6 +358,17 @@ module.exports = {
                 hinhThucTT, tenGioKham, ngayKhamBenh, giaKham
             } = req.body;
 
+            console.log("tt: ", req.body);
+            console.log("ngayKhamBenh:", ngayKhamBenh, "typeof ngayKhamBenh:", typeof ngayKhamBenh);
+            console.log("tenGioKham:", tenGioKham, "typeof tenGioKham:", typeof tenGioKham);
+
+            if (!tenGioKham || typeof tenGioKham !== 'string') {
+            return res.status(400).json({ message: 'Khung giờ khám không hợp lệ' });
+            }
+            if (!ngayKhamBenh || typeof ngayKhamBenh !== 'string') {
+            return res.status(400).json({ message: 'Ngày khám bệnh không hợp lệ' });
+            }
+
             // Parse the date
             const [day, month, year] = ngayKhamBenh.split('/').map(Number);
             const appointmentDate = new Date(year, month - 1, day);
@@ -550,7 +561,7 @@ module.exports = {
             );
 
             // Lấy returnUrl từ frontend gửi lên, nếu không có thì sử dụng mặc định
-            const returnUrl = req.body?.returnUrl || 'http://localhost:8089/api/doctor/vnpay_return';
+            const returnUrl = req.body?.returnUrl || 'http://localhost:8086/api/doctor/vnpay_return';
 
             // Tạo URL thanh toán
             const paymentUrl = vnpay.buildPaymentUrl({
@@ -577,7 +588,7 @@ module.exports = {
 
     fetchAllDoctor: async (req, res) => {
         try {
-            const { page, limit, firstName, lastName, address } = req.query; // Lấy trang và kích thước trang từ query
+            const { page, limit, firstName, lastName, address, chuyenKhoaId, phongKhamId } = req.query; // Lấy trang và kích thước trang từ query
 
             // Chuyển đổi thành số
             const pageNumber = parseInt(page, 10);
@@ -587,13 +598,7 @@ module.exports = {
             const skip = (pageNumber - 1) * limitNumber;
 
             // Tạo query tìm kiếm
-            const query = {};
-            // if (firstName) {
-            //     query.firstName = { $regex: firstName, $options: 'i' }; // Tìm kiếm không phân biệt chữ hoa chữ thường
-            // }
-            // if (lastName) {
-            //     query.lastName = { $regex: lastName, $options: 'i' };
-            // }
+            const query = {};            
             // Tạo điều kiện tìm kiếm
             if (firstName || lastName || address) {
                 const searchKeywords = (firstName || '') + ' ' + (lastName || '') + ' ' + (address || '');
@@ -608,6 +613,16 @@ module.exports = {
                 }));
 
                 query.$or = searchConditions;
+            }
+
+            // Lọc theo chuyên khoa
+            if (chuyenKhoaId) {
+            query.chuyenKhoaId = { $in: [chuyenKhoaId] }; // vì là array
+            }
+
+            // Lọc theo phòng khám
+            if (phongKhamId) {
+            query.phongKhamId = phongKhamId;
             }
 
             // Tìm tất cả bác sĩ với phân trang
