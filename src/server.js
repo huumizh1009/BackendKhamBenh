@@ -6,6 +6,7 @@ const userRouter = require('./route/userRouter');
 const doctorRouter = require('./route/doctorRouter');
 const uploadRouter = require('./route/uploadRouter');
 const cauhoiRouter = require('./route/cauHoiRouter');
+const aiSuggestRouter = require('./route/aiSuggest');
 const connectDB = require('./config/connectDB');
 const cors = require('cors');
 const multer = require('multer');
@@ -69,6 +70,7 @@ app.use("/api/doctor", doctorRouter);
 // Sử dụng uploadRouter
 app.use("/api/doctor", uploadRouter); // Đặt đường dẫn cho upload
 app.use("/api/cauhoi", cauhoiRouter); // Đặt đường dẫn cho upload
+app.use("/api/chatgpt", aiSuggestRouter); // Đặt đường dẫn cho upload
 
 
 // Hàm cron job xóa lịch quá hạn
