@@ -16,6 +16,8 @@
   "author": "dokhactu",
   "license": "ISC",
   "dependencies": {
+    "@zoom/videosdk": "^2.2.0",
+    "agora-token": "^2.0.4",
     "bcrypt": "^5.1.1",
     "body-parser": "^1.19.0",
     "cookie-parser": "^1.4.6",
@@ -27,7 +29,6 @@
     "moment": "^2.30.1",
     "moment-timezone": "^0.5.46",
     "mongoose": "^8.6.1",
-    "mongoose-delete": "0.5.4",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.16",

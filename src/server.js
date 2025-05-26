@@ -16,6 +16,7 @@ const cron = require('node-cron');
 // const moment = require('moment');
 import moment from 'moment-timezone';
 const KhamBenh = require('./model/KhamBenh');
+const { RtcTokenBuilder, RtcRole } = require('agora-token');
 
 require("dotenv").config();
 
@@ -23,6 +24,8 @@ let app = express();
 let port = process.env.PORT || 6969;
 const hostname = process.env.HOST_NAME;
 
+const APP_ID = process.env.APP_ID;
+const APP_CERTIFICATE = process.env.APP_CERTIFICATE;
 connectDB();
 
 // Cài đặt CORS
@@ -137,6 +140,35 @@ setInterval(async () => {
     }
 }, 1000 * 60 * 1); // 1 phút
 
+app.get('/rtc-token', (req, res) => {
+    const channelName = req.query.channel;
+    if (!channelName) {
+        return res.status(400).json({ error: 'Channel name is required' });
+    }
+
+    const uid = 0; // để Agora tự tạo UID
+    const role = RtcRole.PUBLISHER;
+    const expireTimeInSeconds = 3600;
+
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const privilegeExpireTime = currentTimestamp + expireTimeInSeconds;
+
+    try {
+        const token = RtcTokenBuilder.buildTokenWithUid(
+        APP_ID,
+        APP_CERTIFICATE,
+        channelName,
+        uid,
+        role,
+        privilegeExpireTime
+        );
+
+        return res.json({ token });
+    } catch (error) {
+        console.error('Error generating token:', error);
+        return res.status(500).json({ error: 'Failed to generate token' });
+    }
+});
 
 app.listen(port, () => {
     console.log("backend nodejs is running on the port:", port, `\n http://localhost:${port}`);

@@ -7,7 +7,7 @@ const KhamBenh_Schema = new mongoose.Schema({
         email: { type: String },        
         gender: { type: Boolean },        
         phone: { type: String },        
-        dateBenhNhan: { type: String, default: null },        
+        dateBenhNhan: { type: String },        
         address: { type: String },        
         lidokham: { type: String },        
         hinhThucTT: { type: String },        
