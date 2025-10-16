@@ -39,6 +39,9 @@ const allowedOrigins = [
     'http://localhost:3000', // admin
     'http://localhost:3002', // home 
     'http://localhost:3001', // doctor
+    'https://homekhambenh.dantri24h.com',
+    'https://adminkhambenh.dantri24h.com',
+    'https://doctorkhambenh.dantri24h.com',
 ];
 
 app.use(cors({
