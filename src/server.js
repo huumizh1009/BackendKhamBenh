@@ -7,6 +7,7 @@ const doctorRouter = require('./route/doctorRouter');
 const uploadRouter = require('./route/uploadRouter');
 const cauhoiRouter = require('./route/cauHoiRouter');
 const aiSuggestRouter = require('./route/aiSuggest');
+const doctorChatRouter = require('./route/doctorChatRouter');
 const connectDB = require('./config/connectDB');
 const cors = require('cors');
 const multer = require('multer');
@@ -18,9 +19,16 @@ import moment from 'moment-timezone';
 const KhamBenh = require('./model/KhamBenh');
 const { RtcTokenBuilder, RtcRole } = require('agora-token');
 
+// ✅ BƯỚC 1: Import http và initSocket
+const http = require('http');
+const { initSocket } = require('./Socket.IO'); // Đảm bảo đường dẫn này đúng
 require("dotenv").config();
 
 let app = express();
+// ✅ BƯỚC 2: Tạo HTTP server từ app Express và khởi tạo Socket.IO
+const server = http.createServer(app);
+initSocket(server);
+
 let port = process.env.PORT || 6969;
 const hostname = process.env.HOST_NAME;
 
@@ -59,8 +67,8 @@ app.options('*', cors()); // Enable preflight requests for all routes
 
 
 // Config bodyParser
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: "50mb" }));
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 
 // Đặt thư mục public/uploads làm public để có thể truy cập
 app.use('/uploads', express.static(path.join(__dirname, './public/uploads')));
@@ -75,7 +83,7 @@ app.use("/api/doctor", doctorRouter);
 app.use("/api/doctor", uploadRouter); // Đặt đường dẫn cho upload
 app.use("/api/cauhoi", cauhoiRouter); // Đặt đường dẫn cho upload
 app.use("/api/chatgpt", aiSuggestRouter); // Đặt đường dẫn cho upload
-
+app.use('/api/doctor-chat', doctorChatRouter);
 
 // Hàm cron job xóa lịch quá hạn
 cron.schedule("*/10 * * * * *", async () => {
@@ -172,6 +180,6 @@ app.get('/rtc-token', (req, res) => {
     }
 });
 
-app.listen(port, () => {
+server.listen(port, () => {
     console.log("backend nodejs is running on the port:", port, `\n http://localhost:${port}`);
 });
