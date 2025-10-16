@@ -36,10 +36,9 @@ connectDB();
 //     })
 // );
 const allowedOrigins = [
-    'http://localhost:3000', // Local development
-    'http://localhost:3002', // Local development
-    'http://localhost:3001', // Local development
-    'https://datlichkhambenh.dokhactu.site', // Production
+    'http://localhost:3000', // admin
+    'http://localhost:3002', // home 
+    'http://localhost:3001', // doctor
 ];
 
 app.use(cors({
