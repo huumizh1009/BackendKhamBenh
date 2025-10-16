@@ -15,7 +15,7 @@ const initSocket = (server) => {
             'http://localhost:3002', // home 
             'http://localhost:3001', // doctor
             'https://homekhambenh.dantri24h.com',
-            'https://homekhambenh.dantri24h.com',
+            'https://adminkhambenh.dantri24h.com',
             'https://doctorkhambenh.dantri24h.com',
         ],
       methods: ["GET", "POST"],
