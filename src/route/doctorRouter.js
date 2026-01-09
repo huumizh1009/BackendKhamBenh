@@ -37,7 +37,9 @@ const {
     createChuyenKhoa,
     fetchChuyenKhoaByID,
     fetchAllChuyenKhoa,
-    fetchPhongKhamByID
+    fetchPhongKhamByID,
+    thanhToanOnlineSepay,
+    layChiTietDonHang
 } = require("../controllers/User/user.doctor.controller");
 
 const { IpnFailChecksum, VNPay, IpnOrderNotFound, IpnInvalidAmount, InpOrderAlreadyConfirmed, IpnSuccess, IpnUnknownError, ignoreLogger, VerifyReturnUrl } = require("vnpay");
@@ -148,5 +150,8 @@ router.get('/vnpay_return', async (req, res) => {
         // });
     }
 });
+
+router.post("/thanh-toan-online-sepay", thanhToanOnlineSepay);
+router.get("/:maDonHang", layChiTietDonHang);
 
 module.exports = router;
