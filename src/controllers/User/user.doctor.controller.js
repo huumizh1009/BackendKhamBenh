@@ -18,6 +18,7 @@ const moment = require('moment-timezone');
 const KhamBenh = require('../../model/KhamBenh');
 
 const nodemailer = require('nodemailer');
+const SePayTransaction = require('../../model/SepayTransaction');
 
 const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -219,28 +220,14 @@ const sendAppointmentEmailBenhAn = async (email, patientName, nameDoctor, tenGio
 };
 
 const vnpay = new VNPay({
-    tmnCode: '4WKUEION',
-    secureSecret: '2ZPPJ91HOK6J7JE6G3CUNRPGWJXJ4369',
+    tmnCode: 'RWGT12RE',
+    secureSecret: 'QY7RO4BTNA0NUG0ZS30M59RQNHIHRFKT',
     vnpayHost: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
     testMode: true, // tùy chọn, ghi đè vnpayHost thành sandbox nếu là true
-    hashAlgorithm: 'SHA512', // tùy chọn
-
-    /**
-     * Sử dụng enableLog để bật/tắt logger
-     * Nếu enableLog là false, loggerFn sẽ không được sử dụng trong bất kỳ phương thức nào
-     */
-    enableLog: true, // optional
-
-    /**
-     * Hàm `loggerFn` sẽ được gọi để ghi log
-     * Mặc định, loggerFn sẽ ghi log ra console
-     * Bạn có thể ghi đè loggerFn để ghi log ra nơi khác
-     *
-     * `ignoreLogger` là một hàm không làm gì cả
-     */
+    hashAlgorithm: 'SHA512', // tùy chọn   
+    enableLog: true, // optional   
     loggerFn: ignoreLogger, // optional
 });
-
 
 module.exports = {
     updateTTBN: async (req, res) => {
@@ -2082,6 +2069,201 @@ module.exports = {
         } catch (error) {
             console.error(error);  // In ra lỗi chi tiết
             res.status(500).send("Error fetching sales data", error);
+        }
+    },
+
+    thanhToanOnlineSepay: async (req, res) => {
+        try {
+            console.log("🔍 Raw body từ SePay:", JSON.stringify(req.body, null, 2));
+
+            // ✅ Chuẩn bị dữ liệu từ SePay webhook
+            const sePayWebhookData = {
+            sepayId: req.body.id,
+            gateway: req.body.gateway,
+            transactionDate: new Date(req.body.transactionDate),
+            accountNumber: req.body.accountNumber,
+            subAccount: req.body.subAccount || "",
+            code: req.body.code || "",
+            content: req.body.content,
+            transferType: req.body.transferType || "in",
+            description: req.body.description || "",
+            transferAmount: parseFloat(req.body.transferAmount),
+            referenceCode: req.body.referenceCode || "",
+            accumulated: parseInt(req.body.accumulated) || 0,
+            };
+
+            console.log("📝 Parsed data:", JSON.stringify(sePayWebhookData, null, 2));
+
+            // ✅ Trích xuất mã đơn hàng từ nội dung
+            const idOrder = sePayWebhookData.content.replace(/DH\s*/gi, "").trim();
+            console.log("📦 Mã đơn hàng:", idOrder);
+            console.log("💰 Số tiền:", sePayWebhookData.transferAmount);
+
+            // 1️⃣ BẢO MẬT: Kiểm tra API Key từ SePay
+            const authorizationAPI = req.headers.authorization;
+
+            if (authorizationAPI !== process.env.SEPAY_API_KEY) {
+            console.error("❌ API Key không hợp lệ");
+            return res.status(401).json({ message: "Unauthorized: Sai API Key" });
+            }
+
+
+
+            // 2️⃣ KIỂM TRA TRÙNG LẶP
+            const existingTransaction = await SePayTransaction.findOne({ 
+            sepayId: sePayWebhookData.sepayId 
+            });
+
+            console.log("==> ĐANG TÌM TRONG DB VỚI sepayId =", sePayWebhookData.sepayId);
+            console.log("==> KẾT QUẢ TÌM:", existingTransaction);
+
+            // if (existingTransaction) {
+            //   console.log("⚠️ Giao dịch đã xử lý:", sePayWebhookData.sepayId);
+            //   return res.status(200).json({ 
+            //     message: "Giao dịch đã được xử lý trước đó",
+            //     transactionId: existingTransaction._id 
+            //   });
+            // }
+
+            // 3️⃣ TÌM ĐƠN HÀNG
+            const order = await KhamBenh.findOne({ maDonHang: idOrder });
+
+            if (!order) {
+            // ✅ Lưu giao dịch thất bại để đối soát
+            console.log("💾 Đang lưu transaction (không tìm thấy đơn)...");
+            
+            // ✅ THAY ĐỔI: Dùng insertMany thay vì create
+            const failedTransactionResult = await SePayTransaction.collection.insertOne({
+                sepayId: sePayWebhookData.sepayId,
+                gateway: sePayWebhookData.gateway,
+                transactionDate: sePayWebhookData.transactionDate,
+                accountNumber: sePayWebhookData.accountNumber,
+                subAccount: sePayWebhookData.subAccount,
+                code: sePayWebhookData.code,
+                content: sePayWebhookData.content,
+                transferType: sePayWebhookData.transferType,
+                description: sePayWebhookData.description,
+                transferAmount: sePayWebhookData.transferAmount,
+                referenceCode: sePayWebhookData.referenceCode,
+                accumulated: sePayWebhookData.accumulated,
+                orderId: idOrder,
+                processedAt: new Date(),
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            });
+
+            console.log("✅ Đã lưu transaction:", failedTransactionResult.insertedId);
+            console.error("❌ Không tìm thấy đơn hàng:", idOrder);
+            
+            return res.status(200).json({
+                success: false,
+                message: "Đã lưu giao dịch nhưng không tìm thấy đơn hàng: " + idOrder,
+                transactionId: failedTransactionResult.insertedId,
+            });
+            }
+
+            // 4️⃣ KIỂM TRA SỐ TIỀN
+            let trangThaiMoi = order.trangThaiThanhToan;
+            const soTienThieu = order.giaKham - sePayWebhookData.transferAmount;
+
+            if (soTienThieu <= 0) {
+            trangThaiMoi = true;
+            console.log("✅ Thanh toán đủ/thừa:", Math.abs(soTienThieu));
+            }  else {
+            console.warn(`⚠️ Thanh toán thiếu: Cần ${order.giaKham}, nhận ${sePayWebhookData.transferAmount}`);
+            }
+
+            // 5️⃣ LƯU GIAO DỊCH
+            console.log("💾 Đang lưu transaction...");
+            
+            // ✅ THAY ĐỔI: Dùng insertOne thay vì create
+            const newTransactionResult = await SePayTransaction.collection.insertOne({
+            sepayId: sePayWebhookData.sepayId,
+            gateway: sePayWebhookData.gateway,
+            transactionDate: sePayWebhookData.transactionDate,
+            accountNumber: sePayWebhookData.accountNumber,
+            subAccount: sePayWebhookData.subAccount,
+            code: sePayWebhookData.code,
+            content: sePayWebhookData.content,
+            transferType: sePayWebhookData.transferType,
+            description: sePayWebhookData.description,
+            transferAmount: sePayWebhookData.transferAmount,
+            referenceCode: sePayWebhookData.referenceCode,
+            accumulated: sePayWebhookData.accumulated,
+            orderId: order.maDonHang,
+            processedAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            });
+
+            const transactionId = newTransactionResult.insertedId;
+            console.log("✅ Đã lưu transaction:", transactionId);
+
+            // 6️⃣ CẬP NHẬT ĐƠN HÀNG
+            console.log("📝 Đang cập nhật đơn hàng...");
+            
+            const updatedOrder = await KhamBenh.findOneAndUpdate(
+            { maDonHang: idOrder },
+            {
+                $set: {
+                trangThaiThanhToan: trangThaiMoi,
+                trangThaiXacNhan: true,
+                trangThai: "Đã đặt lịch"
+                //   phuongThucThanhToan: "Chuyển khoản",
+                },
+                $push: {
+                transactionHistory: {
+                    date: new Date(),
+                    amount: sePayWebhookData.transferAmount,
+                    type: "deposit",
+                    reference: String(sePayWebhookData.referenceCode || sePayWebhookData.sepayId),
+                    gateway: sePayWebhookData.gateway,
+                    transactionId: transactionId,
+                },
+                },
+            },
+            { new: true }
+            );
+
+            console.log("✅ Xử lý thành công đơn hàng:", order.maDonHang);
+
+            return res.status(200).json({
+            success: true,
+            data: {
+                orderId: updatedOrder.maDonHang,
+                trangThaiThanhToan: updatedOrder.trangThaiThanhToan,
+                soTienCanThanhToan: updatedOrder.giaKham,
+                soTienNhan: sePayWebhookData.transferAmount,
+                transactionId: transactionId,
+            },
+            message: "Xử lý thanh toán thành công",
+            });
+
+        } catch (error) {
+            console.error("❌ Lỗi SePay Webhook:", error);
+            console.error("Stack trace:", error.stack);
+            
+            return res.status(500).json({ 
+            success: false,
+            message: error.message || "Internal Server Error",
+            error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+            });
+        }
+    },
+
+    layChiTietDonHang: async (req, res) => {
+        try {
+            const { maDonHang } = req.params;
+            const don = await KhamBenh.findOne({ maDonHang }).populate(
+            "_idTaiKhoan _idDoctor",
+            );
+            if (!don)
+            return res
+                .status(404)
+                .json({ success: false, message: "Không tìm thấy đơn hàng!" });
+            res.json({ success: true, data: don });
+        } catch (err) {
+            res.status(500).json({ success: false, message: err.message });
         }
     },
 }
